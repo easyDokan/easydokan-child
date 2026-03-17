@@ -1,0 +1,113 @@
+/**
+ * Theme Name:     easyDokan Child theme for your WordPress Website
+ * Author:         easyDokan
+ * Template:       hello-elementor
+ * Text Domain:	   easydokan-child
+ * Description:    Kadence Theme is a lightweight yet full featured WordPress theme for creating beautiful fast loading and accessible websites, easier than ever. It features an easy to use drag and drop header and footer builder to build any type of header in minutes. It features a full library of gorgeous starter templates that are easy to modify with our intelligent global font and color controls. With extensive integration with the most popular 3rd party plugins, you can quickly build impressive ecommerce websites, course websites, business websites, and more.
+ * Theme URI:      https://easydokan.com
+ * Author URI:     https://easydokan.com
+ * Version:        1.0.0
+ */
+p {
+    margin-bottom: 0 !important;
+}
+
+#content .page-header {
+    background: #fef2f2;
+    padding: 30px 0;
+    text-align: center;
+}
+
+#content .page-header > h1 {
+    font-size: 32px;
+}
+
+.ed-footer .elementor-nav-menu--main .elementor-nav-menu a, .ed-footer .elementor-nav-menu--main .elementor-nav-menu a.highlighted, .ed-footer .elementor-nav-menu--main .elementor-nav-menu a:focus, .ed-footer .elementor-nav-menu--main .elementor-nav-menu a:hover {
+    padding: 12px 0 !important;
+}
+
+.ed-footer .elementor-nav-menu--main .elementor-nav-menu a:hover {
+    color: var(--e-global-color-primary);
+}
+
+/*#ed-categories .product-category {*/
+/*    border: 1px solid #dedede;*/
+/*    border-radius: 10px;*/
+/*    overflow: hidden;*/
+/*    padding: 5px 5px 15px 5px;*/
+/*    transition: 0.3s;*/
+/*}*/
+/*#ed-categories .product-category:hover {*/
+/*    border-color: var( --e-global-color-primary );*/
+/*}*/
+/*#ed-categories .product-category img {*/
+/*    border-radius: 10px;*/
+/*    min-height: 200px;*/
+/*    margin: 0 0 20px 0;*/
+/*}*/
+#ed-products .product {
+    transition: 0.3s;
+    overflow: hidden;
+}
+
+#ed-products .product > a {
+    overflow: hidden;
+    border-radius: 10px;
+}
+
+#ed-products .product img {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+#ed-products .ed-product-details {
+    background: var(--e-global-color-secondary);
+    color: #f7f7f7;
+    text-align: center;
+    width: 100%;
+    display: inline-block;
+    border-radius: 8px;
+    padding: 8px;
+    margin-top: 20px;
+    transition: 0.3s;
+    text-transform: uppercase;
+}
+
+#ed-products .ed-product-details:hover {
+    background: var(--e-global-color-primary);
+}
+
+#ed-single-product-images {
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 10px;
+}
+
+#ed-single-product-images ol.flex-control-nav {
+    overflow: hidden;
+    display: flex;
+    justify-content: start;
+    flex-direction: column;
+    width: 350px;
+}
+
+#ed-single-product-images ol.flex-control-nav li {
+    width: 100%;
+}
+
+#ed-single-product-images ol.flex-control-nav > li:first-child {
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    overflow: hidden;
+}
+
+#ed-single-product-images ol.flex-control-nav > li:last-child {
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+    overflow: hidden;
+}
+
+#ed-single-product-images ol.flex-control-nav img {
+    width: 100%;
+}
