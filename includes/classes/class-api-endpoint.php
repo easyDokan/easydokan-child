@@ -223,6 +223,12 @@ class ED_CONNECT_API {
 						}
 
 						$variation->update_meta_data( '_ezd_var_id', $var_meta_id );
+						$variation->update_meta_data( '_ezd_exact_variation_key', sanitize_text_field( $v_data['key'] ) );
+						
+						if ( isset( $v_data['variant_id'] ) ) {
+							$variation->update_meta_data( '_ezd_variant_id', sanitize_text_field( $v_data['variant_id'] ) );
+						}
+						
 						$variation->save();
 					}
 				}
@@ -333,6 +339,15 @@ class ED_CONNECT_API {
 
 		try {
 			// 1. Basic Store Info Sync
+			if ( isset( $parameters['store_id'] ) ) {
+				update_option( 'easydokan_store_id', sanitize_text_field( $parameters['store_id'] ) );
+			}
+			if ( isset( $parameters['backend_api_url'] ) ) {
+				update_option( 'easydokan_backend_api_url', esc_url_raw( $parameters['backend_api_url'] ) );
+			}
+			if ( isset( $parameters['frontend_app_url'] ) ) {
+				update_option( 'easydokan_frontend_app_url', esc_url_raw( $parameters['frontend_app_url'] ) );
+			}
 			if ( isset( $parameters['name'] ) ) {
 				update_option( 'easydokan_store_name', sanitize_text_field( $parameters['name'] ) );
 			}
@@ -385,62 +400,22 @@ class ED_CONNECT_API {
 				}
 			}
 
-			// 3. Shipping Sync (Dynamic Divisions & Pricing Cascade)
+			// 3. Shipping Sync (Base Location Storage)
 			if ( isset( $parameters['shipping'] ) ) {
 				$shipping      = $parameters['shipping'];
-				$base_division = sanitize_text_field( $shipping['base_division'] ?? 'Dhaka' );
+				$base_location = sanitize_text_field( $shipping['base_division'] ?? 'Dhaka' );
 
 				$inside  = $shipping['inside'] ?? array();
 				$outside = $shipping['outside'] ?? array();
 
-				// Inherit Priority cascade: sale pricing truncates regular if greater than 0
-				$cost_inside  = isset( $inside['sale'] ) && floatval( $inside['sale'] ) > 0 ? floatval( $inside['sale'] ) : floatval( $inside['regular'] ?? 0 );
-				$cost_outside = isset( $outside['sale'] ) && floatval( $outside['sale'] ) > 0 ? floatval( $outside['sale'] ) : floatval( $outside['regular'] ?? 0 );
+				// Store the settings in options table without connecting to shipping zones natively
+				update_option( 'easydokan_shipping_base_location', $base_location );
 
-				// Helper to get or create zone
-				$get_or_create_zone = function ( $zone_name ) {
-					$zones = WC_Shipping_Zones::get_zones();
-					foreach ( $zones as $zone_arr ) {
-						if ( $zone_arr['zone_name'] === $zone_name ) {
-							return new WC_Shipping_Zone( $zone_arr['zone_id'] );
-						}
-					}
-					$zone = new WC_Shipping_Zone();
-					$zone->set_zone_name( $zone_name );
-					$zone->save();
-
-					return $zone;
-				};
-
-				// Helper to set flat rate on zone
-				$set_flat_rate = function ( $zone, $cost ) {
-					$methods      = $zone->get_shipping_methods();
-					$flat_rate_id = null;
-
-					foreach ( $methods as $method ) {
-						if ( $method->id === 'flat_rate' ) {
-							$flat_rate_id                       = $method->instance_id;
-							$method->instance_settings['cost']  = strval( $cost );
-							$method->instance_settings['title'] = 'Flat Rate';
-							update_option( $method->get_instance_option_key(), $method->instance_settings );
-							break;
-						}
-					}
-
-					if ( ! $flat_rate_id ) {
-						$instance_id                        = $zone->add_shipping_method( 'flat_rate' );
-						$method                             = new WC_Shipping_Flat_Rate( $instance_id );
-						$method->instance_settings['cost']  = strval( $cost );
-						$method->instance_settings['title'] = 'Flat Rate';
-						update_option( $method->get_instance_option_key(), $method->instance_settings );
-					}
-				};
-
-				$zone_inside = $get_or_create_zone( 'Inside ' . $base_division );
-				$set_flat_rate( $zone_inside, $cost_inside );
-
-				$zone_outside = $get_or_create_zone( 'Outside ' . $base_division );
-				$set_flat_rate( $zone_outside, $cost_outside );
+				// Raw structured costs
+				update_option( 'easydokan_shipping_inside_regular_cost', floatval( $inside['regular'] ?? 0 ) );
+				update_option( 'easydokan_shipping_inside_sale_cost', floatval( $inside['sale'] ?? 0 ) );
+				update_option( 'easydokan_shipping_outside_regular_cost', floatval( $outside['regular'] ?? 0 ) );
+				update_option( 'easydokan_shipping_outside_sale_cost', floatval( $outside['sale'] ?? 0 ) );
 			}
 
 			return rest_ensure_response( array( 'success' => true, 'message' => 'Store options synchronized successfully.' ) );

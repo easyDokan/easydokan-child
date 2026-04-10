@@ -8,45 +8,51 @@
  * @version 3.0.0
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly
+if (!defined('ABSPATH')) {
+    exit; // Exit if accessed directly
 }
 
 global $product;
 
-$whatsapp_number = get_option( 'easydokan_store_mobile', '8801841650668' ); // Fallback to image number if not set
-$whatsapp_url    = 'https://wa.me/' . preg_replace( '/[^0-9]/', '', $whatsapp_number );
+$whatsapp_number = get_option('easydokan_store_mobile', '8801841650668'); // Fallback to image number if not set
+$product_url = get_permalink($product->get_id());
+$whatsapp_msg = rawurlencode("I want to purchase this product: " . $product_url);
+$whatsapp_url = 'https://wa.me/' . preg_replace('/[^0-9]/', '', $whatsapp_number) . '?text=' . $whatsapp_msg;
 
 // Get product data
-$product_id  = $product->get_id();
-$is_variable = $product->is_type( 'variable' );
-$variations  = $is_variable ? $product->get_available_variations() : array();
+$product_id = $product->get_id();
+$is_variable = $product->is_type('variable');
+$variations = $is_variable ? $product->get_available_variations() : array();
 
 /**
  * Handle Multiple Attributes for Variable Products
  */
-$attributes_map     = array();
+$attributes_map = array();
 $default_attributes = array();
 
-if ( $is_variable && ! empty( $variations ) ) {
-	// Use the first variation as default
-	$first_variation    = reset( $variations );
-	$default_attributes = $first_variation['attributes'];
+if ($is_variable && !empty($variations)) {
+    // Use the first variation as default
+    $first_variation = reset($variations);
+    $default_attributes = $first_variation['attributes'];
 
-	foreach ( $variations as $variation ) {
-		foreach ( $variation['attributes'] as $attr_name => $attr_value ) {
-			// Initialize the attribute group if not exists
-			if ( ! isset( $attributes_map[ $attr_name ] ) ) {
-				$attributes_map[ $attr_name ] = array();
-			}
+    foreach ($variations as $variation) {
+        foreach ($variation['attributes'] as $attr_name => $attr_value) {
+            // Initialize the attribute group if not exists
+            if (!isset($attributes_map[$attr_name])) {
+                $attributes_map[$attr_name] = array();
+            }
 
-			// Add the value to the group (ensure uniqueness)
-			if ( ! in_array( $attr_value, $attributes_map[ $attr_name ] ) ) {
-				$attributes_map[ $attr_name ][] = $attr_value;
-			}
-		}
-	}
+            // Add the value to the group (ensure uniqueness)
+            if (!in_array($attr_value, $attributes_map[$attr_name])) {
+                $attributes_map[$attr_name][] = $attr_value;
+            }
+        }
+    }
 }
+
+// echo "<pre>";
+// print_r($attributes_map);
+// echo "</pre>";
 
 //error_log( var_export( $variations, true ) )
 ?>
@@ -189,20 +195,51 @@ if ( $is_variable && ! empty( $variations ) ) {
 
     .ed-qty-container {
         position: relative;
-        width: 85px;
+        width: 160px;
+        display: flex;
+        align-items: center;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        height: 56px;
+        overflow: hidden;
     }
 
-    .ed-qty-input {
+    .ed-qty-input,
+    .ed-qty-input:hover,
+    .ed-qty-input:focus,
+    .ed-qty-input:active {
+        flex: 1;
         width: 100%;
-        height: 56px;
-        border: 2px solid #e2e8f0;
-        border-radius: 12px;
+        height: 100%;
+        border: none !important;
         text-align: center;
         font-size: 18px;
         font-weight: 700;
-        background: #f8fafc;
+        background: transparent;
         -moz-appearance: textfield;
         appearance: none;
+        padding: 0;
+        outline: none;
+    }
+
+    .ed-qty-btn {
+        width: 40px;
+        height: 100%;
+        border: none;
+        background: transparent;
+        color: #64748b;
+        font-size: 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background-color 0.2s, color 0.2s;
+    }
+
+    .ed-qty-btn:hover {
+        background-color: #e2e8f0;
+        color: #0f172a;
     }
 
     .ed-qty-input::-webkit-outer-spin-button,
@@ -261,11 +298,13 @@ if ( $is_variable && ! empty( $variations ) ) {
         text-transform: none;
         font-size: 18px;
         height: 56px;
+        color: #fff;
     }
 
     .ed-btn-whatsapp:hover {
         background: #0d8a6a;
         box-shadow: 0 4px 12px rgba(16, 163, 127, 0.25);
+        color: #fff;
     }
 
     /* Hide standard WooCommerce elements to avoid duplication */
@@ -275,31 +314,32 @@ if ( $is_variable && ! empty( $variations ) ) {
     }
 </style>
 
-<div class="ed-product-price" id="ed-product-container" data-product-id="<?php echo esc_attr( $product_id ); ?>" data-type="<?php echo esc_attr( $product->get_type() ); ?>">
+<div class="ed-product-price" id="ed-product-container" data-product-id="<?php echo esc_attr($product_id); ?>"
+    data-type="<?php echo esc_attr($product->get_type()); ?>">
 
-	<?php if ( $is_variable ) : ?>
+    <?php if ($is_variable): ?>
         <div class="ed-variation-selector">
-			<?php foreach ( $attributes_map as $attr_name => $options ) :
-				$label = str_replace( 'attribute_', '', $attr_name );
-				$label = ucwords( str_replace( array( '-', '_' ), ' ', $label ) );
-				?>
-                <div class="ed-variation-group" data-attribute-name="<?php echo esc_attr( $attr_name ); ?>">
-                    <div class="ed-variation-label"><?php echo esc_html( $label ); ?>: <span style="color: #ef4444;">*</span></div>
+            <?php foreach ($attributes_map as $attr_name => $options):
+                $label = str_replace('attribute_', '', $attr_name);
+                $label = ucwords(str_replace(array('-', '_'), ' ', $label));
+                ?>
+                <div class="ed-variation-group" data-attribute-name="<?php echo esc_attr($attr_name); ?>">
+                    <div class="ed-variation-label"><?php echo esc_html($label); ?>: <span style="color: #ef4444;">*</span>
+                    </div>
                     <div class="ed-variation-options">
-						<?php foreach ( $options as $option ) :
-							$is_active = ( isset( $default_attributes[ $attr_name ] ) && $default_attributes[ $attr_name ] === $option );
-							?>
-                            <button type="button"
-                                    class="ed-variation-btn <?php echo $is_active ? 'active' : ''; ?>"
-                                    data-value="<?php echo esc_attr( $option ); ?>">
-								<?php echo esc_html( $option ); ?>
+                        <?php foreach ($options as $option):
+                            $is_active = (isset($default_attributes[$attr_name]) && $default_attributes[$attr_name] === $option);
+                            ?>
+                            <button type="button" class="ed-variation-btn <?php echo $is_active ? 'active' : ''; ?>"
+                                data-value="<?php echo esc_attr($option); ?>">
+                                <?php echo esc_html($option); ?>
                             </button>
-						<?php endforeach; ?>
+                        <?php endforeach; ?>
                     </div>
                 </div>
-			<?php endforeach; ?>
+            <?php endforeach; ?>
         </div>
-	<?php endif; ?>
+    <?php endif; ?>
 
     <div class="ed-price-box">
         <div class="ed-price-row">
@@ -307,37 +347,33 @@ if ( $is_variable && ! empty( $variations ) ) {
             <span class="ed-sale-price" id="ed-display-sale-price"></span>
             <span class="ed-discount-badge" id="ed-display-discount"></span>
         </div>
-        <div class="ed-stock-status" id="ed-display-stock">
-            In Stock: Loading...
-        </div>
     </div>
 
     <div class="ed-actions-row">
         <div class="ed-qty-container">
+            <button type="button" class="ed-qty-btn ed-qty-minus">-</button>
             <input type="number" id="ed-qty" class="ed-qty-input" value="1" min="1">
+            <button type="button" class="ed-qty-btn ed-qty-plus">+</button>
         </div>
         <button type="button" class="ed-btn ed-btn-cart" id="ed-add-to-cart">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="9" cy="21" r="1"/>
-                <circle cx="20" cy="21" r="1"/>
-                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="9" cy="21" r="1" />
+                <circle cx="20" cy="21" r="1" />
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
             </svg>
             ADD TO CART
         </button>
-        <button type="button" class="ed-btn ed-btn-buy" id="ed-buy-now">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        <a href="<?php echo esc_url($whatsapp_url); ?>" class="ed-btn ed-btn-whatsapp" target="_blank">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                        d="M12.031 6.172c-2.32 0-4.525.903-6.205 2.541a8.814 8.814 0 0 0-2.5 6.208c0 1.6.438 3.167 1.258 4.536l-1.334 4.888 4.996-1.314c1.32.723 2.805 1.103 4.316 1.104h.004c2.32 0 4.526-.902 6.205-2.54 1.678-1.638 2.5-3.815 2.5-6.108 0-4.81-3.906-8.724-8.74-8.724zm4.49 12.326c-.19.531-1.077 1.018-1.493 1.082-.375.058-.698.058-2.02-.455-1.57-.61-2.583-2.185-2.66-2.288-.078-.103-.64-.852-.64-1.626 0-.773.407-1.155.552-1.31s.315-.194.42-.194c.105 0 .21 0 .302.006.096.002.226-.037.352.261.13.308.442 1.082.481 1.16.04.077.065.167.013.27-.052.103-.078.167-.156.257-.078.091-.163.203-.233.274-.078.077-.158.162-.068.318.09.155.398.656.853 1.062.585.52 1.078.681 1.233.758.156.077.247.065.338-.039s.39-.455.494-.61c.105-.154.21-.129.352-.077s.9.425 1.056.502c.156.077.26.116.299.18.038.065.038.374-.152.905zM12 2C6.477 2 2 6.477 2 12c0 1.892.527 3.66 1.442 5.167L2 22l4.98-1.303C8.428 21.583 10.143 22 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z" />
             </svg>
-            BUY NOW
-        </button>
+		    <?php echo esc_html($whatsapp_number); ?>
+        </a>
     </div>
 
-    <a href="<?php echo esc_url( $whatsapp_url ); ?>" class="ed-btn ed-btn-whatsapp" target="_blank">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12.031 6.172c-2.32 0-4.525.903-6.205 2.541a8.814 8.814 0 0 0-2.5 6.208c0 1.6.438 3.167 1.258 4.536l-1.334 4.888 4.996-1.314c1.32.723 2.805 1.103 4.316 1.104h.004c2.32 0 4.526-.902 6.205-2.54 1.678-1.638 2.5-3.815 2.5-6.108 0-4.81-3.906-8.724-8.74-8.724zm4.49 12.326c-.19.531-1.077 1.018-1.493 1.082-.375.058-.698.058-2.02-.455-1.57-.61-2.583-2.185-2.66-2.288-.078-.103-.64-.852-.64-1.626 0-.773.407-1.155.552-1.31s.315-.194.42-.194c.105 0 .21 0 .302.006.096.002.226-.037.352.261.13.308.442 1.082.481 1.16.04.077.065.167.013.27-.052.103-.078.167-.156.257-.078.091-.163.203-.233.274-.078.077-.158.162-.068.318.09.155.398.656.853 1.062.585.52 1.078.681 1.233.758.156.077.247.065.338-.039s.39-.455.494-.61c.105-.154.21-.129.352-.077s.9.425 1.056.502c.156.077.26.116.299.18.038.065.038.374-.152.905zM12 2C6.477 2 2 6.477 2 12c0 1.892.527 3.66 1.442 5.167L2 22l4.98-1.303C8.428 21.583 10.143 22 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
-        </svg>
-		<?php echo esc_html( $whatsapp_number ); ?>
-    </a>
+
 </div>
 
 <script>
@@ -347,15 +383,31 @@ if ( $is_variable && ! empty( $variations ) ) {
             regularPrice: document.getElementById('ed-display-regular-price'),
             salePrice: document.getElementById('ed-display-sale-price'),
             discount: document.getElementById('ed-display-discount'),
-            stock: document.getElementById('ed-display-stock')
         };
         const qtyInput = document.getElementById('ed-qty');
+        const qtyMinusBtn = document.querySelector('.ed-qty-minus');
+        const qtyPlusBtn = document.querySelector('.ed-qty-plus');
         const addToCartBtn = document.getElementById('ed-add-to-cart');
-        const buyNowBtn = document.getElementById('ed-buy-now');
 
-        const variations = <?php echo json_encode( $variations ); ?>;
+        qtyMinusBtn.addEventListener('click', function () {
+            let currentValue = parseInt(qtyInput.value) || 1;
+            let minValue = parseInt(qtyInput.min) || 1;
+            if (currentValue > minValue) {
+                qtyInput.value = currentValue - 1;
+            }
+        });
+
+        qtyPlusBtn.addEventListener('click', function () {
+            let currentValue = parseInt(qtyInput.value) || 1;
+            let maxValue = parseInt(qtyInput.max) || 9999;
+            if (currentValue < maxValue) {
+                qtyInput.value = currentValue + 1;
+            }
+        });
+
+        const variations = <?php echo json_encode($variations); ?>;
         const isVariable = container.dataset.type === 'variable';
-        
+
         let currentVariationId = null;
         let selectedAttributes = {};
 
@@ -377,9 +429,6 @@ if ( $is_variable && ! empty( $variations ) ) {
                 labels.regularPrice.style.display = 'none';
                 labels.discount.style.display = 'none';
             }
-
-            labels.stock.textContent = 'In Stock: ' + (stock > 0 ? stock + ' available' : 'Out of stock');
-            labels.stock.style.color = stock > 0 ? '#10b981' : '#ef4444';
         }
 
         function findMatchingVariation() {
@@ -392,23 +441,23 @@ if ( $is_variable && ! empty( $variations ) ) {
 
         if (isVariable) {
             const groups = document.querySelectorAll('.ed-variation-group');
-            
+
             groups.forEach(group => {
                 const attrName = group.dataset.attributeName;
                 const buttons = group.querySelectorAll('.ed-variation-btn');
-                
+
                 buttons.forEach(btn => {
                     const val = btn.dataset.value;
-                    
+
                     if (btn.classList.contains('active')) {
                         selectedAttributes[attrName] = val;
                     }
 
-                    btn.addEventListener('click', function() {
+                    btn.addEventListener('click', function () {
                         buttons.forEach(b => b.classList.remove('active'));
                         this.classList.add('active');
                         selectedAttributes[attrName] = val;
-                        
+
                         const match = findMatchingVariation();
                         if (match) {
                             currentVariationId = match.variation_id;
@@ -477,15 +526,6 @@ if ( $is_variable && ! empty( $variations ) ) {
                 return;
             }
             triggerAddToCart(container.dataset.productId, qtyInput.value, isVariable ? id : null, false);
-        });
-
-        buyNowBtn.addEventListener('click', function () {
-            const id = isVariable ? currentVariationId : container.dataset.productId;
-            if (isVariable && !id) {
-                alert('Please select all options');
-                return;
-            }
-            triggerAddToCart(container.dataset.productId, qtyInput.value, isVariable ? id : null, true);
         });
     });
 </script>
