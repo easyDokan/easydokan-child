@@ -9,6 +9,58 @@ class ED_CONNECT_WC_Adjustments {
 		add_filter( 'option_woocommerce_cod_settings', array( $this, 'force_cod_enabled' ) );
 		add_filter( 'post_thumbnail_html', array( $this, 'override_product_thumbnail' ), 10, 5 );
 		add_action( 'woocommerce_before_subcategory_title', array( $this, 'override_category_thumbnail' ), 1 );
+		add_action( 'admin_menu', array( $this, 'hide_woocommerce_menu' ), 999 );
+		add_action( 'admin_init', array( $this, 'disable_access_to_admin_pages' ), 999 );
+	}
+
+	function remove_admin_feature( $features ) {
+
+		$features_to_remove = [ 'analytics', 'payment-gateway-suggestions' ];
+
+		return array_values( array_diff( $features, $features_to_remove ) );
+	}
+
+	public function disable_access_to_admin_pages() {
+		global $pagenow;
+
+		$restricted_urls  = [
+			'plugins.php',
+			'plugin-install.php',
+			'plugin-editor.php',
+			'themes.php',
+			'theme-install.php',
+			'theme-editor.php'
+		];
+		$restricted_pages = [
+			'wc-settings',
+			'wc-admin',
+			'hello-elementor',
+		];
+		$current_page     = isset( $_GET['page'] ) ? sanitize_text_field( $_GET['page'] ) : '';
+
+		if ( in_array( $pagenow, $restricted_urls ) || in_array( $current_page, $restricted_pages ) ) {
+			wp_die( 'Access to this page has been disabled for security reasons.', 'Access Denied', [ 'response' => 403 ] );
+		}
+
+		if ( isset( $_GET['page'] ) && $_GET['page'] === 'wc-admin' ) {
+			if ( isset( $_GET['path'] ) && ( strpos( $_GET['path'], '/analytics' ) !== false || strpos( $_GET['path'], '/payments' ) !== false ) ) {
+				wp_die( 'Access Denied.', 'Access Denied', [ 'response' => 403 ] );
+			}
+		}
+	}
+
+	public function hide_woocommerce_menu() {
+		remove_menu_page( 'woocommerce' );
+		remove_menu_page( 'woocommerce-marketing' );
+		remove_menu_page( 'plugins.php' );
+		remove_menu_page( 'themes.php' );
+		remove_menu_page( 'wc-admin&path=/payments/overview' );
+		remove_menu_page( 'wc-admin&path=/analytics/overview' );
+		remove_menu_page( 'hello-elementor' );
+
+		remove_menu_page( 'admin.php?page=wc-settings&tab=checkout' );
+		remove_menu_page( 'admin.php?page=wc-settings&tab=checkout&from=PAYMENTS_MENU_ITEM' );
+		remove_menu_page( 'wc-admin&path=/payments/connect' );
 	}
 
 	public function override_category_thumbnail( $category ) {
