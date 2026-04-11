@@ -36,17 +36,27 @@ add_filter( 'upload_mimes', 'ed_allow_svg_uploads' );
 /**
  * EasyDokan Core Integrations
  */
-
-// Load API Routing for external Node.js syncs
 require_once get_stylesheet_directory() . '/includes/classes/class-api-endpoint.php';
-
-// Load WooCommerce Adjustments & Hooks securely
 require_once get_stylesheet_directory() . '/includes/classes/class-wc-adjustments.php';
-
-// Load Checkout Customizations securely
 require_once get_stylesheet_directory() . '/includes/classes/class-checkout-manager.php';
-
 require_once get_stylesheet_directory() . '/includes/classes/class-shortcodes.php';
+
+if ( ! function_exists( 'easydokan_enqueue_scripts' ) ) {
+	function easydokan_enqueue_scripts() {
+
+		$localize_scripts = array(
+			'ajax_url'  => admin_url( 'admin-ajax.php' ),
+			'copy_text' => esc_html__( 'Copied.', 'tinypress' ),
+		);
+
+		wp_enqueue_script( 'easydokan', get_stylesheet_directory_uri() . '/assets/front/js/scripts.js', array( 'jquery' ) );
+		wp_localize_script( 'easydokan', 'tinypress', $localize_scripts );
+
+		wp_enqueue_style( 'easydokan-theme', get_stylesheet_directory_uri() . '/style.css' );
+		wp_enqueue_style( 'easydokan', get_stylesheet_directory_uri() . '/assets/front/css/main.min.css' );
+	}
+}
+add_action( 'wp_enqueue_scripts', 'easydokan_enqueue_scripts' );
 
 
 add_filter( 'woocommerce_product_get_image', function ( $image, $product, $size ) {
@@ -70,10 +80,6 @@ add_action( 'woocommerce_after_shop_loop_item', function () {
 	echo '<a class="ed-product-details" href="' . get_permalink( $product->get_id() ) . '">Order Now</a>';
 
 }, 15 );
-
-add_filter( 'woocommerce_add_to_cart_redirect', function () {
-	return wc_get_checkout_url();
-} );
 
 add_action( 'wp_head', function () {
 	if ( isset( $_GET['debug'] ) && sanitize_text_field( $_GET['debug'] ) === 'yes' ) {
@@ -175,10 +181,6 @@ add_action( 'wp_head', function () {
 					if ( $product->is_type( 'variation' ) ) {
 						$variation_key = get_post_meta( $product->get_id(), '_ezd_exact_variation_key', true );
 					}
-
-					echo "<pre>";
-					var_dump( $variation_key );
-					echo "</pre>";
 
 					$products_payload[] = array(
 						'product_id'    => $ezd_id,

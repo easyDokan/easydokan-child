@@ -9,15 +9,11 @@ class ED_CONNECT_WC_Adjustments {
 		add_filter( 'option_woocommerce_cod_settings', array( $this, 'force_cod_enabled' ) );
 		add_filter( 'post_thumbnail_html', array( $this, 'override_product_thumbnail' ), 10, 5 );
 		add_action( 'woocommerce_before_subcategory_title', array( $this, 'override_category_thumbnail' ), 1 );
-		add_action( 'admin_menu', array( $this, 'hide_woocommerce_menu' ), 999 );
-		add_action( 'admin_init', array( $this, 'disable_access_to_admin_pages' ), 999 );
-	}
 
-	function remove_admin_feature( $features ) {
-
-		$features_to_remove = [ 'analytics', 'payment-gateway-suggestions' ];
-
-		return array_values( array_diff( $features, $features_to_remove ) );
+		if ( defined( 'EASYDOKAN_CONTROL' ) && EASYDOKAN_CONTROL == false ) {
+			add_action( 'admin_menu', array( $this, 'hide_woocommerce_menu' ), 999 );
+			add_action( 'admin_init', array( $this, 'disable_access_to_admin_pages' ), 999 );
+		}
 	}
 
 	public function disable_access_to_admin_pages() {
