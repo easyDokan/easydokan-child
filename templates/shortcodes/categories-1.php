@@ -19,13 +19,14 @@ if ( empty( $categories ) || is_wp_error( $categories ) ) {
 
 <div class="ed-categories">
 	<?php foreach ( $categories as $category ) :
-		$image_url = get_term_meta( $category->term_id, '_ed_category_thumbnail_url', true );
+		$thumbnail_id = get_term_meta( $category->term_id, 'thumbnail_id', true );
+
+		if ( $thumbnail_id ) {
+			$image_url = wp_get_attachment_url( $thumbnail_id );
+		}
 
 		if ( empty( $image_url ) ) {
-			$thumbnail_id = get_term_meta( $category->term_id, 'thumbnail_id', true );
-			if ( $thumbnail_id ) {
-				$image_url = wp_get_attachment_url( $thumbnail_id );
-			}
+			$image_url = get_term_meta( $category->term_id, '_ed_category_thumbnail_url', true );
 		}
 
 		if ( empty( $image_url ) ) {

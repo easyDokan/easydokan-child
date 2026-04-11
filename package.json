@@ -4,7 +4,9 @@
     "main": "index.js",
     "scripts": {
         "build:scss": "sass assets/front/scss/main.scss assets/front/css/main.min.css --style compressed --no-source-map",
-        "dev:scss": "sass assets/front/scss/main.scss assets/front/css/main.min.css --watch --style compressed"
+        "dev:scss": "sass assets/front/scss/main.scss assets/front/css/main.min.css --watch --style compressed",
+        "build": "npm run build:scss",
+        "zip": "npm run build && zip -r easydokan-child.zip . -x \"node_modules/*\" \"node_modules\" \".git/*\" \".git\" \"*.zip\" \"package-lock.json\" \"package.json\" \".gitignore\""
     },
     "repository": {
         "type": "git",

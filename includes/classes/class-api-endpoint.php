@@ -7,6 +7,93 @@ class ED_CONNECT_API {
 		add_action( 'rest_api_init', array( $this, 'register_routes' ) );
 	}
 
+	private function sideload_image( string $url, int $post_id = 0 ): int {
+		if ( empty( $url ) ) {
+			return 0;
+		}
+
+		$existing = get_posts( array(
+			'post_type'   => 'attachment',
+			'post_status' => 'inherit',
+			'meta_key'    => '_ed_source_url',
+			'meta_value'  => $url,
+			'numberposts' => 1,
+			'fields'      => 'ids',
+		) );
+
+		if ( ! empty( $existing ) ) {
+			$attachment_id = $existing[0];
+
+			if ( $post_id > 0 ) {
+				wp_update_post( array(
+					'ID'          => $attachment_id,
+					'post_parent' => $post_id,
+				) );
+			}
+
+			return $attachment_id;
+		}
+
+		$response = wp_remote_get( $url, array( 'timeout' => 30 ) );
+
+		if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
+			error_log( 'ED Image Sideload Failed: ' . $url );
+
+			return 0;
+		}
+
+		$image_data = wp_remote_retrieve_body( $response );
+		if ( empty( $image_data ) ) {
+			return 0;
+		}
+
+		$filename = basename( wp_parse_url( $url, PHP_URL_PATH ) );
+		if ( empty( $filename ) || strpos( $filename, '.' ) === false ) {
+			$content_type = wp_remote_retrieve_header( $response, 'content-type' );
+			$ext          = 'jpg';
+			if ( strpos( $content_type, 'png' ) !== false ) {
+				$ext = 'png';
+			} elseif ( strpos( $content_type, 'webp' ) !== false ) {
+				$ext = 'webp';
+			} elseif ( strpos( $content_type, 'gif' ) !== false ) {
+				$ext = 'gif';
+			}
+			$filename = 'ed-product-' . md5( $url ) . '.' . $ext;
+		}
+
+		$upload = wp_upload_bits( $filename, null, $image_data );
+
+		if ( ! empty( $upload['error'] ) ) {
+			error_log( 'ED Image Upload Error: ' . $upload['error'] );
+
+			return 0;
+		}
+
+		$file_type = wp_check_filetype( $upload['file'], null );
+
+		$attachment = array(
+			'post_mime_type' => $file_type['type'],
+			'post_title'     => sanitize_file_name( pathinfo( $filename, PATHINFO_FILENAME ) ),
+			'post_content'   => '',
+			'post_status'    => 'inherit',
+			'post_parent'    => $post_id,
+		);
+
+		$attachment_id = wp_insert_attachment( $attachment, $upload['file'], $post_id );
+
+		if ( is_wp_error( $attachment_id ) || ! $attachment_id ) {
+			return 0;
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		$metadata = wp_generate_attachment_metadata( $attachment_id, $upload['file'] );
+		wp_update_attachment_metadata( $attachment_id, $metadata );
+
+		update_post_meta( $attachment_id, '_ed_source_url', $url );
+
+		return $attachment_id;
+	}
+
 	public function register_routes() {
 		register_rest_route( 'easydokan/v1', '/sync/products', array(
 			'methods'             => 'POST',
@@ -25,6 +112,58 @@ class ED_CONNECT_API {
 			'callback'            => array( $this, 'sync_store' ),
 			'permission_callback' => array( $this, 'check_permissions' ),
 		) );
+		register_rest_route( 'easydokan/v1', '/generate-login-url', array(
+			'methods'             => 'POST',
+			'callback'            => array( $this, 'generate_login_url' ),
+			'permission_callback' => array( $this, 'check_permissions' ), // Basic Auth protected
+		) );
+
+		register_rest_route( 'easydokan/v1', '/magic-login', array(
+			'methods'             => 'GET',
+			'callback'            => array( $this, 'process_magic_login' ),
+			'permission_callback' => '__return_true', // Public, secured by token
+		) );
+	}
+
+	public function generate_login_url( WP_REST_Request $request ) {
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			return new WP_Error( 'unauthorized', 'User not authenticated', array( 'status' => 401 ) );
+		}
+
+		$token = wp_generate_password( 32, false );
+		// Store transient for 60 seconds
+		set_transient( 'ed_magic_login_' . $token, $user_id, 60 );
+
+		$login_url = rest_url( 'easydokan/v1/magic-login?token=' . $token );
+
+		return rest_ensure_response( array(
+			'success' => true,
+			'url'     => $login_url
+		) );
+	}
+
+	public function process_magic_login( WP_REST_Request $request ) {
+		$token = $request->get_param( 'token' );
+		if ( empty( $token ) ) {
+			wp_die( 'Invalid or missing token.', 'Login Failed', array( 'response' => 400 ) );
+		}
+
+		$user_id = get_transient( 'ed_magic_login_' . $token );
+		if ( ! $user_id ) {
+			wp_die( 'This magic login link is invalid or has expired.', 'Login Expired', array( 'response' => 403 ) );
+		}
+
+		// Delete the transient to ensure single use
+		delete_transient( 'ed_magic_login_' . $token );
+
+		// Log the user in
+		wp_set_current_user( $user_id );
+		wp_set_auth_cookie( $user_id, true );
+
+		// Redirect to dashboard
+		wp_safe_redirect( admin_url() );
+		exit;
 	}
 
 	public function check_permissions() {
@@ -59,10 +198,9 @@ class ED_CONNECT_API {
 
 				if ( ! empty( $existing_products ) ) {
 					$existing_id = $existing_products[0]->get_id();
-					// Class name dynamic factory
-					$classname = WC_Product_Factory::get_classname_from_product_type( $product_type );
-					$product   = new $classname( $existing_id );
-					$is_new    = false;
+					$classname   = WC_Product_Factory::get_classname_from_product_type( $product_type );
+					$product     = new $classname( $existing_id );
+					$is_new      = false;
 				} else {
 					$classname = WC_Product_Factory::get_classname_from_product_type( $product_type );
 					$product   = new $classname();
@@ -109,7 +247,6 @@ class ED_CONNECT_API {
 					$product->set_stock_quantity( intval( $p_data['stock_quantity'] ) );
 				}
 
-				// Map Categories
 				$category_ids = array();
 				if ( isset( $p_data['categories'] ) && is_array( $p_data['categories'] ) ) {
 					foreach ( $p_data['categories'] as $cat_name ) {
@@ -124,13 +261,12 @@ class ED_CONNECT_API {
 				}
 				$product->set_category_ids( $category_ids );
 
-				// Map Attributes
 				$wc_attributes = array();
 				if ( isset( $p_data['attributes'] ) && is_array( $p_data['attributes'] ) ) {
 					$position = 0;
 					foreach ( $p_data['attributes'] as $attr_data ) {
 						$attribute = new WC_Product_Attribute();
-						$attribute->set_id( 0 ); // Local attribute
+						$attribute->set_id( 0 );
 						$attribute->set_name( sanitize_text_field( $attr_data['name'] ) );
 						$attribute->set_options( array_map( 'sanitize_text_field', current( (array) $attr_data['options'] ) ? $attr_data['options'] : array() ) );
 						$attribute->set_position( $position ++ );
@@ -141,10 +277,7 @@ class ED_CONNECT_API {
 				}
 				$product->set_attributes( $wc_attributes );
 
-				// Override logic: Clear existing variations and attributes if requested
 				if ( ! empty( $p_data['override'] ) && $p_data['override'] === true && ! $is_new ) {
-					// Clear product attributes (set_attributes above handles current, but metadata might persist)
-					// Clear existing variations
 					$children = $product->get_children();
 					foreach ( $children as $child_id ) {
 						$variation = wc_get_product( $child_id );
@@ -158,6 +291,10 @@ class ED_CONNECT_API {
 
 				if ( isset( $p_data['thumbnail_url'] ) && ! empty( $p_data['thumbnail_url'] ) ) {
 					$product->update_meta_data( '_ed_product_thumbnail_url', esc_url_raw( $p_data['thumbnail_url'] ) );
+					$thumb_attachment_id = $this->sideload_image( esc_url_raw( $p_data['thumbnail_url'] ), $product->get_id() ?: 0 );
+					if ( $thumb_attachment_id > 0 ) {
+						$product->set_image_id( $thumb_attachment_id );
+					}
 				}
 
 				if ( isset( $p_data['image_urls'] ) && is_array( $p_data['image_urls'] ) ) {
@@ -166,17 +303,32 @@ class ED_CONNECT_API {
 
 				$product_id = $product->save();
 
-				error_log( 'attributes_come:' . var_export( $p_data['variations'], true ) );
+				if ( isset( $p_data['image_urls'] ) && is_array( $p_data['image_urls'] ) && ! empty( $p_data['image_urls'] ) ) {
+					$gallery_ids = array();
 
-				// Map Variations
+					foreach ( $p_data['image_urls'] as $index => $img_url ) {
+						$attachment_id = $this->sideload_image( esc_url_raw( $img_url ), $product_id );
+
+						if ( $attachment_id > 0 ) {
+							if ( $index === 0 ) {
+								set_post_thumbnail( $product_id, $attachment_id );
+							} else {
+								$gallery_ids[] = $attachment_id;
+							}
+						}
+					}
+
+					if ( ! empty( $gallery_ids ) ) {
+						update_post_meta( $product_id, '_product_image_gallery', implode( ',', $gallery_ids ) );
+					}
+				}
+
 				if ( $has_variations && $product_id ) {
 					foreach ( $p_data['variations'] as $v_data ) {
 						$key_parts            = explode( '#', $v_data['key'] );
 						$variation_attributes = array();
 
 						foreach ( $p_data['attributes'] as $index => $attr_data ) {
-							// WooCommerce requires variation meta keys to be prefixed with 'attribute_'
-							// and the attribute name should be sanitized consistently (lowercase slug).
 							$attr_slug     = sanitize_title( $attr_data['name'] );
 							$attr_meta_key = 'attribute_' . $attr_slug;
 
@@ -201,8 +353,6 @@ class ED_CONNECT_API {
 						$variation->set_parent_id( $product_id );
 						$variation->set_attributes( $variation_attributes );
 
-						error_log( 'attributes_saving:' . var_export( $variation_attributes, true ) );
-
 						if ( isset( $v_data['regular_price'] ) ) {
 							$variation->set_regular_price( floatval( $v_data['regular_price'] ) );
 						}
@@ -224,11 +374,11 @@ class ED_CONNECT_API {
 
 						$variation->update_meta_data( '_ezd_var_id', $var_meta_id );
 						$variation->update_meta_data( '_ezd_exact_variation_key', sanitize_text_field( $v_data['key'] ) );
-						
+
 						if ( isset( $v_data['variant_id'] ) ) {
 							$variation->update_meta_data( '_ezd_variant_id', sanitize_text_field( $v_data['variant_id'] ) );
 						}
-						
+
 						$variation->save();
 					}
 				}
@@ -245,7 +395,6 @@ class ED_CONNECT_API {
 			}
 		}
 
-		// --- Categories Independent Sync Addon ---
 		if ( isset( $parameters['categories'] ) && is_array( $parameters['categories'] ) ) {
 			foreach ( $parameters['categories'] as $cat_data ) {
 				try {
@@ -253,15 +402,12 @@ class ED_CONNECT_API {
 					$cat_desc = wp_kses_post( $cat_data['description'] );
 					$cat_img  = esc_url_raw( $cat_data['image_url'] );
 
-					// 1. Check if term exists natively
 					$term = term_exists( $cat_name, 'product_cat' );
 					if ( ! $term ) {
-						// Create it if the product sequence somehow missed it
 						$term = wp_insert_term( $cat_name, 'product_cat', array(
 							'description' => $cat_desc
 						) );
 					} else {
-						// It exists, attempt to safely update description
 						if ( ! is_wp_error( $term ) ) {
 							wp_update_term( $term['term_id'], 'product_cat', array(
 								'description' => $cat_desc
@@ -269,12 +415,17 @@ class ED_CONNECT_API {
 						}
 					}
 
-					// 2. Map Image URL as a custom term_meta field (WooCommerce inherently relies on Attachment IDs for thumbnail_id natively, so we are bypassing it)
 					if ( ! is_wp_error( $term ) && isset( $term['term_id'] ) ) {
 						if ( ! empty( $cat_img ) ) {
 							update_term_meta( $term['term_id'], '_ed_category_thumbnail_url', $cat_img );
+
+							$cat_attachment_id = $this->sideload_image( $cat_img );
+							if ( $cat_attachment_id > 0 ) {
+								update_term_meta( $term['term_id'], 'thumbnail_id', $cat_attachment_id );
+							}
 						} else {
-							delete_term_meta( $term['term_id'], '_ed_category_thumbnail_url' ); // Clean up if they delete the image locally
+							delete_term_meta( $term['term_id'], '_ed_category_thumbnail_url' );
+							delete_term_meta( $term['term_id'], 'thumbnail_id' );
 						}
 					}
 				} catch ( Exception $e ) {
@@ -338,7 +489,6 @@ class ED_CONNECT_API {
 		$parameters = $request->get_json_params();
 
 		try {
-			// 1. Basic Store Info Sync
 			if ( isset( $parameters['store_id'] ) ) {
 				update_option( 'easydokan_store_id', sanitize_text_field( $parameters['store_id'] ) );
 			}
@@ -358,7 +508,6 @@ class ED_CONNECT_API {
 				update_option( 'easydokan_store_mobile', sanitize_text_field( $parameters['mobile_number'] ) );
 			}
 
-			// 2. Address Sync
 			if ( isset( $parameters['address'] ) ) {
 				$address = $parameters['address'];
 				if ( isset( $address['street'] ) ) {
@@ -373,10 +522,9 @@ class ED_CONNECT_API {
 				if ( isset( $address['postcode'] ) ) {
 					update_option( 'woocommerce_store_postcode', sanitize_text_field( $address['postcode'] ) );
 				}
-				update_option( 'woocommerce_default_country', 'BD' ); // Ensure Bangladesh locale base
+				update_option( 'woocommerce_default_country', 'BD' );
 			}
 
-			// 2. Tax / VAT Sync
 			if ( isset( $parameters['tax'] ) ) {
 				$tax        = $parameters['tax'];
 				$is_enabled = ! empty( $tax['enabled'] ) && $tax['enabled'] !== 'false' && $tax['enabled'] !== false;
@@ -400,7 +548,6 @@ class ED_CONNECT_API {
 				}
 			}
 
-			// 3. Shipping Sync (Base Location Storage)
 			if ( isset( $parameters['shipping'] ) ) {
 				$shipping      = $parameters['shipping'];
 				$base_location = sanitize_text_field( $shipping['base_division'] ?? 'Dhaka' );
@@ -408,10 +555,7 @@ class ED_CONNECT_API {
 				$inside  = $shipping['inside'] ?? array();
 				$outside = $shipping['outside'] ?? array();
 
-				// Store the settings in options table without connecting to shipping zones natively
 				update_option( 'easydokan_shipping_base_location', $base_location );
-
-				// Raw structured costs
 				update_option( 'easydokan_shipping_inside_regular_cost', floatval( $inside['regular'] ?? 0 ) );
 				update_option( 'easydokan_shipping_inside_sale_cost', floatval( $inside['sale'] ?? 0 ) );
 				update_option( 'easydokan_shipping_outside_regular_cost', floatval( $outside['regular'] ?? 0 ) );
