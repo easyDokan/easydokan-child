@@ -36,6 +36,7 @@ add_filter( 'upload_mimes', 'ed_allow_svg_uploads' );
 /**
  * EasyDokan Core Integrations
  */
+require_once get_stylesheet_directory() . '/includes/classes/class-theme-updater.php';
 require_once get_stylesheet_directory() . '/includes/classes/class-api-endpoint.php';
 require_once get_stylesheet_directory() . '/includes/classes/class-wc-adjustments.php';
 require_once get_stylesheet_directory() . '/includes/classes/class-checkout-manager.php';
