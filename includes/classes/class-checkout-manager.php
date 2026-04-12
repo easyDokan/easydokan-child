@@ -414,17 +414,6 @@ class ED_CONNECT_Checkout_Manager {
                         </tr>
                         </tfoot>
                     </table>
-
-                    <div class="ed-cod-box">
-                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 500;">
-                            পন্য হাতে পেয়ে মূল্য পরিশোধ
-                        </label>
-                    </div>
-
-                    <p class="ed-terms">Your personal data will be used to process your order, support your experience
-                        throughout this website, and for other purposes described in our privacy policy.</p>
-
-                    <button type="button" id="ed_confirm_order" class="ed-btn">আপনার অর্ডার নিশ্চিত করুন</button>
                 </div>
 
                 <!-- Right Panel: Address & Selection -->
@@ -476,6 +465,17 @@ class ED_CONNECT_Checkout_Manager {
                             </span>
                         </label>
                     </div>
+
+                    <div class="ed-cod-box" style="margin-top: 30px;">
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 500;">
+                            পন্য হাতে পেয়ে মূল্য পরিশোধ
+                        </label>
+                    </div>
+
+                    <p class="ed-terms">Your personal data will be used to process your order, support your experience
+                        throughout this website, and for other purposes described in our privacy policy.</p>
+
+                    <button type="button" id="ed_confirm_order" class="ed-btn">আপনার অর্ডার নিশ্চিত করুন</button>
                 </div>
 
             </div>
