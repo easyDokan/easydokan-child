@@ -180,7 +180,13 @@ class ED_CONNECT_API {
 			return new WP_Error( 'invalid_data', 'Invalid products data', array( 'status' => 400 ) );
 		}
 
-		$results = array( 'created' => 0, 'updated' => 0, 'failed' => 0, 'errors' => array() );
+		$results = array( 
+			'created' => 0, 
+			'updated' => 0, 
+			'failed' => 0, 
+			'errors' => array(),
+			'product_urls' => array()
+		);
 
 		foreach ( $parameters['products'] as $p_data ) {
 			try {
@@ -302,6 +308,9 @@ class ED_CONNECT_API {
 				}
 
 				$product_id = $product->save();
+				
+				// Return the permanent link for this product
+				$results['product_urls'][$ezd_id] = get_permalink($product_id);
 
 				if ( isset( $p_data['image_urls'] ) && is_array( $p_data['image_urls'] ) && ! empty( $p_data['image_urls'] ) ) {
 					$gallery_ids = array();
