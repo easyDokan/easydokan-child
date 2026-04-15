@@ -384,8 +384,8 @@ class ED_CONNECT_API {
 						$variation->update_meta_data( '_ezd_var_id', $var_meta_id );
 						$variation->update_meta_data( '_ezd_exact_variation_key', sanitize_text_field( $v_data['key'] ) );
 
-						if ( isset( $v_data['variant_id'] ) ) {
-							$variation->update_meta_data( '_ezd_variant_id', sanitize_text_field( $v_data['variant_id'] ) );
+						if ( isset( $v_data['_id'] ) ) {
+							$variation->update_meta_data( '_ezd_variant_id', sanitize_text_field( $v_data['_id'] ) );
 						}
 
 						$variation->save();
